@@ -9,7 +9,11 @@ import { setConnectionState } from "../src/lib/db";
 import { start } from "../src/lib/baileys/client";
 
 const DATA_DIR = path.resolve(process.cwd(), "data");
+const AUTH_DIR = path.resolve(process.cwd(), "auth");
 const RESTART_FLAG = path.join(DATA_DIR, ".restart");
+
+// Limpiar credenciales viejas al arrancar — evita el bucle 401 con sesiones inválidas
+try { fs.rmSync(AUTH_DIR, { recursive: true, force: true }); } catch {}
 
 // Limpiar estado al arrancar
 setConnectionState({ status: "disconnected", qr_string: null, phone: null });
