@@ -23,14 +23,17 @@ let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 export async function start(): Promise<void> {
   const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
 
-  // Siempre obtener la versión más reciente — WhatsApp rechaza versiones viejas con code 405
+  // Obtener la versión más reciente con timeout — si GitHub no responde en 8s seguimos con la bundled
   let version: [number, number, number] | undefined;
   try {
-    const fetched = await fetchLatestBaileysVersion();
+    const timeout = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error("timeout")), 8_000)
+    );
+    const fetched = await Promise.race([fetchLatestBaileysVersion(), timeout]);
     version = fetched.version;
     console.log(`[bot] Versión WA Web: ${version.join(".")}`);
   } catch (err) {
-    console.warn("[bot] No se pudo obtener última versión de Baileys:", err);
+    console.warn("[bot] No se pudo obtener última versión de Baileys (usando bundled):", err);
   }
 
   const sock = makeWASocket({
