@@ -1,0 +1,22 @@
+# dependencias
+node_modules/
+
+# Next.js
+.next/
+out/
+
+# datos en tiempo de ejecución (conversaciones, sesión WA)
+data/
+auth/
+
+# variables de entorno locales
+.env.local
+.env*.local
+
+# logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
