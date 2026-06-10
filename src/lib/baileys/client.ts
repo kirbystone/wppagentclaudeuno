@@ -6,6 +6,7 @@ import makeWASocket, {
 } from "@whiskeysockets/baileys";
 import pino from "pino";
 import path from "node:path";
+import fs from "node:fs";
 import { setConnectionState, getConnectionState } from "../db";
 import { startMessageHandler } from "./handler";
 
@@ -92,9 +93,10 @@ export async function start(): Promise<void> {
         console.log(`[bot] Conexión cerrada — code ${code}`);
 
         if (code === DisconnectReason.loggedOut) {
+          console.log("[bot] Sesión inválida (401) — borrando credenciales para nuevo QR...");
+          try { fs.rmSync(AUTH_DIR, { recursive: true, force: true }); } catch {}
           setConnectionState({ status: "disconnected", qr_string: null, phone: null });
-          console.log("[bot] Sesión cerrada (loggedOut). Reconectando para nuevo QR...");
-          scheduleReconnect(code);
+          scheduleReconnect(0);
           return;
         }
 
