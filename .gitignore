@@ -17,6 +17,9 @@ auth/
 *.log
 npm-debug.log*
 
+# TypeScript build cache
+tsconfig.tsbuildinfo
+
 # OS
 .DS_Store
 Thumbs.db
