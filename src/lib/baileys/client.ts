@@ -20,8 +20,42 @@ export interface BotHandle {
 
 let handle: BotHandle | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+let isStarting = false;
+
+// Códigos que indican sesión irrecuperable — requieren credenciales nuevas
+const FATAL_CODES = new Set([
+  DisconnectReason.loggedOut, // 401
+  DisconnectReason.forbidden, // 403
+  500,                        // badSession
+]);
+
+function clearAuth(): void {
+  try {
+    fs.rmSync(AUTH_DIR, { recursive: true, force: true });
+    console.log("[bot] Credenciales eliminadas OK");
+  } catch (e) {
+    console.error("[bot] Error eliminando credenciales:", e);
+  }
+}
+
+export function forceRestart(): void {
+  console.log("[bot] forceRestart() — limpiando estado y reiniciando...");
+  if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
+  if (handle) {
+    try { handle.sock.ev.removeAllListeners("creds.update"); } catch {}
+    try { handle.sock.end(undefined); } catch {}
+    handle = null;
+  }
+  isStarting = false;
+  clearAuth();
+  setConnectionState({ status: "disconnected", qr_string: null, phone: null });
+  start().catch((err) => console.error("[bot] Error en forceRestart:", err));
+}
 
 export async function start(): Promise<void> {
+  if (isStarting) { console.log("[bot] start() ya en progreso, ignorando"); return; }
+  if (handle) { console.log("[bot] start() ignorado — socket ya activo"); return; }
+  isStarting = true;
   try {
     console.log("[bot] start() — leyendo auth state...");
     const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
@@ -58,6 +92,8 @@ export async function start(): Promise<void> {
       },
     };
 
+    isStarting = false;
+
     sock.ev.on("creds.update", saveCreds);
 
     sock.ev.on("connection.update", (update) => {
@@ -92,11 +128,23 @@ export async function start(): Promise<void> {
         const code = (lastDisconnect?.error as { output?: { statusCode?: number } })?.output?.statusCode;
         console.log(`[bot] Conexión cerrada — code ${code}`);
 
-        if (code === DisconnectReason.loggedOut) {
-          console.log("[bot] Sesión inválida (401) — borrando credenciales para nuevo QR...");
-          try { fs.rmSync(AUTH_DIR, { recursive: true, force: true }); } catch {}
-          setConnectionState({ status: "disconnected", qr_string: null, phone: null });
-          scheduleReconnect(0);
+        if (FATAL_CODES.has(code as number)) {
+          console.log(`[bot] Sesión inválida (code ${code}) — eliminando credenciales para QR nuevo...`);
+
+          // Cancelar reconexión pendiente
+          if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
+
+          // Quitar listener de creds.update ANTES de borrar archivos — previene que saveCreds los restaure
+          sock.ev.removeAllListeners("creds.update");
+          try { sock.end(undefined); } catch {}
+          handle = null;
+
+          // Pequeña espera para que cierren operaciones de archivo en curso
+          setTimeout(() => {
+            clearAuth();
+            setConnectionState({ status: "disconnected", qr_string: null, phone: null });
+            start().catch((err) => console.error("[bot] Error en reinicio post-logout:", err));
+          }, 1_000);
           return;
         }
 
@@ -107,7 +155,7 @@ export async function start(): Promise<void> {
     startMessageHandler(sock);
   } catch (err) {
     console.error("[bot] ERROR CRÍTICO en start():", err);
-    // Reintentar después de 10 segundos
+    isStarting = false;
     setTimeout(() => start(), 10_000);
   }
 }
