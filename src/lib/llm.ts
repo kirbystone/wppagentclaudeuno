@@ -2,16 +2,13 @@ import OpenAI from "openai";
 import { SYSTEM_PROMPT } from "./system-prompt";
 import type { Message } from "./db";
 
-const client = new OpenAI({
-  apiKey: process.env.OPENROUTER_API_KEY,
-  baseURL: "https://openrouter.ai/api/v1",
-  defaultHeaders: {
-    "HTTP-Referer": "http://localhost:3000",
-    "X-Title": "Agente WhatsApp",
-  },
-});
+const BASE_URL = process.env.OLLAMA_BASE_URL ?? "http://localhost:11434/v1";
+const MODEL = process.env.OLLAMA_MODEL ?? "llama3";
 
-const MODEL = process.env.OPENROUTER_MODEL ?? "openai/gpt-4o-mini";
+const client = new OpenAI({
+  baseURL: BASE_URL,
+  apiKey: "ollama", // Ollama no requiere API key real, pero el SDK la exige
+});
 
 export async function generateReply(history: Message[]): Promise<string> {
   const messages: OpenAI.Chat.ChatCompletionMessageParam[] = history.map((m) => ({

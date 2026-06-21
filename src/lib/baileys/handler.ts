@@ -6,7 +6,7 @@ import {
   insertMessage,
   getRecentHistory,
 } from "../db";
-import { generateReply } from "../openrouter";
+import { generateReply } from "../llm";
 
 type WASocket = ReturnType<typeof makeWASocket>;
 
